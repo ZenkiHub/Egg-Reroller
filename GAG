@@ -1,114 +1,183 @@
--- GUI Variables
-local autoStopOn = true
+-- SERVICES
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local collectionService = game:GetService("CollectionService")
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local localPlayer = players.LocalPlayer
+local currentCamera = workspace.CurrentCamera
+
+-- GUI SETUP
+local screenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "PetRandomizerUI"
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 200, 0, 160)
+frame.Position = UDim2.new(0, 10, 0.5, -80)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+frame.BorderSizePixel = 0
+frame.BackgroundTransparency = 0.1
+
+-- TITLE
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 25)
+title.Position = UDim2.new(0, 0, 0, -25)
+title.BackgroundTransparency = 1
+title.Text = "🐾 Pet Randomizer ✨"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+
+-- CREDIT
+local credit = Instance.new("TextLabel", frame)
+credit.Size = UDim2.new(1, 0, 0, 20)
+credit.Position = UDim2.new(0, 0, 1, 0)
+credit.BackgroundTransparency = 1
+credit.Text = "Made by - zenki"
+credit.TextColor3 = Color3.fromRGB(200, 200, 200)
+credit.Font = Enum.Font.SourceSansItalic
+credit.TextScaled = true
+
+-- BUTTON CREATION FUNCTION
+local function createButton(name, text, color, position)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Text = text
+	button.Size = UDim2.new(1, -10, 0, 40)
+	button.Position = position
+	button.Parent = frame
+	button.BackgroundColor3 = color
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.SourceSansBold
+	button.TextScaled = true
+	button.BorderSizePixel = 0
+	return button
+end
+
+-- BUTTONS
+local randomizeButton = createButton("RandomizeButton", "🎲 Randomize Pets", Color3.fromRGB(255, 165, 0), UDim2.new(0, 5, 0, 5))
+local espButton = createButton("ESPButton", "👁 ESP: ON", Color3.fromRGB(40, 40, 40), UDim2.new(0, 5, 0, 50))
+local autoRandomizeButton = createButton("AutoRandomizeButton", "✅ Auto Randomize: OFF", Color3.fromRGB(0, 170, 0), UDim2.new(0, 5, 0, 95))
+
+-- VARIABLES
 local espEnabled = true
 local autoRandomize = false
 
--- Create the GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "PetRandomizerUI"
-gui.ResetOnSpawn = false
-gui.Parent = localPlayer:WaitForChild("PlayerGui")
+-- ESP LOGIC
+local hatchFunction = getupvalue(getupvalue(getconnections(replicatedStorage.GameEvents.PetEggService.OnClientEvent)[1].Function, 1), 2)
+local eggModels = getupvalue(hatchFunction, 1)
+local eggPets = getupvalue(hatchFunction, 2)
 
--- Main Frame
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 160)
-frame.Position = UDim2.new(0, 20, 0, 100)
-frame.BackgroundColor3 = Color3.fromRGB(35, 25, 15)
-frame.BorderSizePixel = 0
-frame.Parent = gui
+local espCache = {}
+local activeEggs = {}
 
--- Title Label
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "✨ Pet Randomizer"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextScaled = true
-title.Parent = frame
+local function getObjectFromId(objectId)
+	for _, eggModel in ipairs(eggModels) do
+		if eggModel:GetAttribute("OBJECT_UUID") == objectId then
+			return eggModel
+		end
+	end
+end
 
--- Subtitle (Made by)
-local subtitle = Instance.new("TextLabel")
-subtitle.Size = UDim2.new(1, 0, 0, 15)
-subtitle.Position = UDim2.new(0, 0, 0, 30)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "Made by - Zenki"
-subtitle.TextColor3 = Color3.fromRGB(200, 200, 200)
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextScaled = true
-subtitle.Parent = frame
+local function UpdateEsp(objectId, petName)
+	if not espEnabled then return end
+	local object = getObjectFromId(objectId)
+	if not object or not espCache[objectId] then return end
+	local eggName = object:GetAttribute("EggName")
+	espCache[objectId].Text = `{eggName} | {petName}`
+end
 
--- Randomize Pets Button
-local randomBtn = Instance.new("TextButton")
-randomBtn.Size = UDim2.new(1, -20, 0, 35)
-randomBtn.Position = UDim2.new(0, 10, 0, 50)
-randomBtn.BackgroundColor3 = Color3.fromRGB(255, 153, 51)
-randomBtn.Text = "🎲 Randomize Pets"
-randomBtn.TextColor3 = Color3.new(1, 1, 1)
-randomBtn.Font = Enum.Font.GothamBold
-randomBtn.TextScaled = true
-randomBtn.Parent = frame
+local function AddEsp(object)
+	if object:GetAttribute("OWNER") ~= localPlayer.Name then return end
+	local eggName = object:GetAttribute("EggName")
+	local petName = eggPets[object:GetAttribute("OBJECT_UUID")]
+	local objectId = object:GetAttribute("OBJECT_UUID")
+	if not objectId then return end
 
-randomBtn.MouseButton1Click:Connect(function()
-    for objectId, data in pairs(displayedEggs) do
-        local pet = getNonRepeatingRandomPet(data.eggName, data.lastPet)
-        if pet and data.label then
-            data.label.Text = data.eggName .. " | " .. pet
-            data.lastPet = pet
-        end
-    end
+	local label = Drawing.new("Text")
+	label.Text = `{eggName} | {petName or "?"}`
+	label.Size = 18
+	label.Color = Color3.new(1, 1, 1)
+	label.Outline = true
+	label.OutlineColor = Color3.new(0, 0, 0)
+	label.Center = true
+	label.Visible = false
+
+	espCache[objectId] = label
+	activeEggs[objectId] = object
+end
+
+local function RemoveEsp(object)
+	if object:GetAttribute("OWNER") ~= localPlayer.Name then return end
+	local objectId = object:GetAttribute("OBJECT_UUID")
+	if espCache[objectId] then
+		espCache[objectId]:Remove()
+		espCache[objectId] = nil
+	end
+	activeEggs[objectId] = nil
+end
+
+local function UpdateAllEsp()
+	if not espEnabled then
+		for _, label in pairs(espCache) do
+			label.Visible = false
+		end
+		return
+	end
+
+	for objectId, object in pairs(activeEggs) do
+		if not object or not object:IsDescendantOf(workspace) then
+			activeEggs[objectId] = nil
+			if espCache[objectId] then
+				espCache[objectId].Visible = false
+			end
+			continue
+		end
+
+		local label = espCache[objectId]
+		if label then
+			local pos, onScreen = currentCamera:WorldToViewportPoint(object:GetPivot().Position)
+			if onScreen then
+				label.Position = Vector2.new(pos.X, pos.Y)
+				label.Visible = true
+			else
+				label.Visible = false
+			end
+		end
+	end
+end
+
+-- INITIATE EXISTING EGGS
+for _, object in collectionService:GetTagged("PetEggServer") do
+	task.spawn(AddEsp, object)
+end
+
+-- LISTEN FOR NEW EGGS
+collectionService:GetInstanceAddedSignal("PetEggServer"):Connect(AddEsp)
+collectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(RemoveEsp)
+
+-- HOOK EGG HATCHING EVENT
+local old
+old = hookfunction(getconnections(replicatedStorage.GameEvents.EggReadyToHatch_RE.OnClientEvent)[1].Function, newcclosure(function(objectId, petName)
+	UpdateEsp(objectId, petName)
+	return old(objectId, petName)
+end))
+
+-- UPDATE ESP EVERY FRAME
+runService.PreRender:Connect(UpdateAllEsp)
+
+-- BUTTON FUNCTIONALITY
+espButton.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	espButton.Text = espEnabled and "👁 ESP: ON" or "👁 ESP: OFF"
 end)
 
--- ESP Toggle Button
-local espBtn = Instance.new("TextButton")
-espBtn.Size = UDim2.new(1, -20, 0, 25)
-espBtn.Position = UDim2.new(0, 10, 0, 90)
-espBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-espBtn.Text = "👁 ESP: ON"
-espBtn.TextColor3 = Color3.new(1, 1, 1)
-espBtn.Font = Enum.Font.GothamBold
-espBtn.TextScaled = true
-espBtn.Parent = frame
-
-espBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    espBtn.Text = espEnabled and "👁 ESP: ON" or "👁 ESP: OFF"
-
-    for objectId, data in pairs(displayedEggs) do
-        if data.gui then
-            data.gui.Enabled = espEnabled
-        end
-    end
+autoRandomizeButton.MouseButton1Click:Connect(function()
+	autoRandomize = not autoRandomize
+	autoRandomizeButton.Text = autoRandomize and "✅ Auto Randomize: ON" or "✅ Auto Randomize: OFF"
 end)
 
--- Auto Randomize Button
-local autoBtn = Instance.new("TextButton")
-autoBtn.Size = UDim2.new(1, -20, 0, 25)
-autoBtn.Position = UDim2.new(0, 10, 0, 120)
-autoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-autoBtn.Text = "✅ Auto Randomize: OFF"
-autoBtn.TextColor3 = Color3.new(1, 1, 1)
-autoBtn.Font = Enum.Font.GothamBold
-autoBtn.TextScaled = true
-autoBtn.Parent = frame
-
-autoBtn.MouseButton1Click:Connect(function()
-    autoRandomize = not autoRandomize
-    autoBtn.Text = autoRandomize and "✅ Auto Randomize: ON" or "✅ Auto Randomize: OFF"
-end)
-
--- Background loop to handle auto randomization
-task.spawn(function()
-    while true do
-        if autoRandomize then
-            for objectId, data in pairs(displayedEggs) do
-                local pet = getNonRepeatingRandomPet(data.eggName, data.lastPet)
-                if pet and data.label then
-                    data.label.Text = data.eggName .. " | " .. pet
-                    data.lastPet = pet
-                end
-            end
-        end
-        task.wait(3) -- repeat every 3 seconds
-    end
+randomizeButton.MouseButton1Click:Connect(function()
+	-- Replace with real pet randomization logic
+	warn("Manual pet randomization triggered!")
 end)
