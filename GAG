@@ -98,21 +98,3 @@ local old; old = hookfunction(getconnections(replicatedStorage.GameEvents.EggRea
 end))
 
 runService.PreRender:Connect(UpdateAllEsp)
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 25)
-title.Position = UDim2.new(0, 0, 0, -25)
-title.BackgroundTransparency = 1
-title.Text = "🐾 Pet Randomizer ✨"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.SourceSansBold
-title.TextScaled = true
-
-local credit = Instance.new("TextLabel", frame)
-credit.Size = UDim2.new(1, 0, 0, 20)
-credit.Position = UDim2.new(0, 0, 0, 130)
-credit.BackgroundTransparency = 1
-credit.Text = "Made by - zenki"
-credit.TextColor3 = Color3.fromRGB(200, 200, 200)
-credit.Font = Enum.Font.SourceSansItalic
-credit.TextScaled = true
